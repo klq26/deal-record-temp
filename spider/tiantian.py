@@ -25,7 +25,7 @@ class tiantian(absspider):
         self.app_name = '天天'
         self.headers = {}
         self.name_mapping = {'klq': '康力泉', 'lsy': '李淑云'}
-        self.set_user_by_mapping(uname)
+        self.set_user_id(uname)
         # 采用抓取“我的对账单”来获取数据
         self.start_year = 1970
         self.start_month = 1
@@ -38,7 +38,7 @@ class tiantian(absspider):
         requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
         pass
     
-    def set_user_by_mapping(self, uname = None):
+    def set_user_id(self, uname = None):
         """
         判断用户是谁，应该读取哪个配置文件
         """
@@ -245,5 +245,5 @@ class tiantian(absspider):
 if __name__ == "__main__":
     tt = tiantian()
     # 设置用户
-    tt.set_user_by_mapping('klq')
+    tt.set_user_id('klq')
     tt.get()

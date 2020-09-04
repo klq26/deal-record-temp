@@ -18,13 +18,13 @@ class danjuan(absspider):
         self.app_name = '蛋卷'
         self.headers = {}
         self.name_mapping = {'klq': '康力泉', 'lsy': '李淑云', 'ksh': '康世海'}
-        self.set_user_by_mapping(uname)
+        self.set_user_id(uname)
         # 蛋卷的交易里面有组合有单独基金，两种情况，解析方法不一样，下面是暂存单独基金交易数据列表的，属于蛋卷特有的情况
         self.df_fund_output_list = pd.DataFrame()
         requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
         pass
     
-    def set_user_by_mapping(self, uname = None):
+    def set_user_id(self, uname = None):
         """
         判断用户是谁，应该读取哪个配置文件
         """
@@ -353,5 +353,5 @@ class danjuan(absspider):
 if __name__ == "__main__":
     dj = danjuan()
     # 设置用户
-    dj.set_user_by_mapping('lsy')
+    dj.set_user_id('lsy')
     dj.get()

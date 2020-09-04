@@ -1,3 +1,6 @@
 __pycache__/
-login/
+login/danjuan_*
+login/qieman_*
+login/tiantian_*
+login/account.py
 app/server/cache/

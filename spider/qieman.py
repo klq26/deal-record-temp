@@ -19,11 +19,11 @@ class qieman(absspider):
         self.headers = {}
         self.name_mapping = {'klq': '康力泉', 'ksh': '康世海'}
         self.plan_list = []
-        self.set_user_by_mapping(uname)
+        self.set_user_id(uname)
         requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
         pass
     
-    def set_user_by_mapping(self, uname = None):
+    def set_user_id(self, uname = None):
         """
         判断用户是谁，应该读取哪个配置文件
         """
@@ -171,5 +171,5 @@ class qieman(absspider):
 if __name__ == "__main__":
     qm = qieman()
     # 设置用户
-    qm.set_user_by_mapping('klq')
+    qm.set_user_id('klq')
     qm.get()

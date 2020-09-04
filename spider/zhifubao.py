@@ -12,7 +12,7 @@ class zhifubao(absspider):
     
     def __init__(self):
         self.app_name = '支付宝'
-        self.input_file_name = 'addition.json'
+        self.input_file_name = '康力泉_addition.json'
         pass
     
     def get_trade_list(self):
