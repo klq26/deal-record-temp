@@ -24,6 +24,7 @@ pd.set_option('display.max_rows', 1100)
 class jqdapter:
 
     def __init__(self):
+        self.folder = os.path.abspath(os.path.dirname(__file__))
         # 分类信息
         self.cm = categories()
         # 登录聚宽
@@ -36,10 +37,10 @@ class jqdapter:
     
     def get_nav_info(self):
         """
-        获取历史上所有基金的非分红交易（买入、卖出等）
+        获取历史上所有基金的交易净值（买入、卖出、分红等）
         TODO 转托管这里好像，不能裸替了事
         """
-
+        print(get_query_count())
         # 说一下逻辑：
         # 1. 从全家所有成交记录中，取出每一只基金的全部记录，并按交易日期去重
         # 2. 因为转托管不是真实价格，所以忽略，分红需要除权日数据，也暂时忽略
@@ -47,19 +48,27 @@ class jqdapter:
         df_results = pd.DataFrame()
         # 所有记录
         df = self.get_all_users_combine_records()
+        # 分红表
+        df_divid = self.get_divid_info()
+
         for code_index, code in enumerate(self.unique_fund_codes):
+            if code == '100032':
+                print('yes')
             # 忽略分红和转托管
-            sub_df = df[(df.code == code) & ~(df.deal_type == '分红') & ~(df.deal_type == '托管转出') & ~(df.deal_type == '托管转入')]
-            fund_trade_days = sub_df.date.unique().tolist()
+            df_trade = df[(df.code == code) & ~(df.deal_type == '分红') & ~(df.deal_type == '托管转出') & ~(df.deal_type == '托管转入')]
+            fund_trade_days = df_trade.date.unique().tolist()
             # 开始日期
             start_date = fund_trade_days[0]
             start_year = int(start_date[0:4])
             start_month = int(start_date[5:7])
-            start_day = int(start_date[8:10])
+            # start_day = int(start_date[8:10])
             # 结束日期
             end_date = datetime.now().strftime('%Y-%m-%d')
             end_year = int(end_date[0:4])
             end_month = int(end_date[5:7])
+            # 分红确认日
+            sub_df_divid = df_divid[(df_divid['基金代码'] == code) & (df_divid['权益登记日'] >= start_date)]
+            divid_days = [x[0:10] for x in sub_df_divid['权益登记日'].tolist()]
             # 把开始和结束日期之间，每个离月末最近的交易日期取出来
             date_range = []
             for year in range(start_year, end_year + 1):
@@ -73,7 +82,7 @@ class jqdapter:
                     [date_range.append('{0}-{1}-01'.format(year, str(x).zfill(2))) for x in range(1, end_month + 1)]
             # 从聚宽取的，每个月最后一个有效交易日
             jq_eof_month_trade_days = []
-            for i, day in enumerate(date_range):
+            for day in date_range:
                 end_date = datetime.strptime(day, '%Y-%m-%d') - timedelta(days=1)
                 # 以月末为 end_date 向前去一天交易日数据（可以是月末这一天，也可以是之前的非休息日）
                 jq_eof_month_trade_days.append(get_trade_days(end_date=end_date, count=1).tolist()[0].strftime('%Y-%m-%d'))
@@ -82,6 +91,7 @@ class jqdapter:
             dates = []
             # 合并去重
             [dates.append(x) for x in fund_trade_days]
+            [dates.append(x) for x in divid_days]
             [dates.append(x) for x in jq_eof_month_trade_days]
             series = pd.Series(dates)
             # 去重后的基金代码
@@ -108,22 +118,42 @@ class jqdapter:
                 'refactor_net_value': '累计复权净值'
             }
             df_jq_fund_nav = df_jq_fund_nav.rename(columns=cn_cols)
+            # 默认 datetime.date 类型。不转换，就无法对比
+            df_jq_fund_nav['交易日'] = df_jq_fund_nav['交易日'].apply(lambda x: x.strftime('%Y-%m-%d'))
+            df_deal_type = df_trade[['date','deal_type']]
+            df_jq_fund_nav = pd.merge(df_jq_fund_nav, df_deal_type, left_on='交易日', right_on='date', how='left')
+            df_jq_fund_nav = df_jq_fund_nav.drop(['date'], axis=1)
+            df_jq_fund_nav.fillna(value = {'deal_type': ''}, inplace=True)
+            df_jq_fund_nav = pd.merge(df_jq_fund_nav, sub_df_divid[['权益登记日','事项名称']], left_on='交易日', right_on='权益登记日', how='left')
+            df_jq_fund_nav = df_jq_fund_nav.drop(['权益登记日'], axis=1)
+            df_jq_fund_nav['月底'] = df_jq_fund_nav['deal_type'].apply(lambda x: '月底' if x == '' else '')
             df_results = pd.concat([df_results, df_jq_fund_nav], ignore_index=True)
             # print(df_jq_fund_nav)
-        df_results.to_excel('基金净值数据.xlsx')
+            if code == '100032':
+                break
+        df_results.to_excel(path.join(self.folder, '基金净值数据.xlsx'))
         pass
 
-    def get_divid_info(self):
+    def get_divid_info(self, cache = True):
         """
         获取历史上所有交易过的基金的分红、拆分数据
         """
+        divid_file_path = path.join(self.folder, '分红拆分记录.xlsx')
+        if cache and os.path.exists(divid_file_path):
+            dtypes = {
+                '基金代码': str,
+                '权益登记日': str
+            }
+            df = pd.read_excel(divid_file_path, dtype = dtypes, index_col=0)
+            return df
+        print(get_query_count())
         # 分红、拆分、合并
         dividend_split_query = query(finance.FUND_DIVIDEND).filter(
-                finance.FUND_DIVIDEND.code.in_(self.unique_fund_codes)
-            ).order_by(
-                finance.FUND_DIVIDEND.code.asc(),
-                finance.FUND_DIVIDEND.pub_date.asc(),
-            )
+            finance.FUND_DIVIDEND.code.in_(self.unique_fund_codes)
+        ).order_by(
+            finance.FUND_DIVIDEND.code.asc(),
+            finance.FUND_DIVIDEND.pub_date.asc(),
+        )
         df_jq_dividend_split = finance.run_query(dividend_split_query)
         # 中文字段名
         cn_columns = {
@@ -157,7 +187,7 @@ class jqdapter:
         df_jq_dividend_split['name'] = df_jq_dividend_split['基金名称']
         df_jq_dividend_split = df_jq_dividend_split[origin_columns]
         df_jq_dividend_split = df_jq_dividend_split.rename(columns={'name': '基金名称'})
-        df_jq_dividend_split.to_excel('分红拆分记录.xlsx')
+        df_jq_dividend_split.to_excel(path.join(self.folder, '分红拆分记录.xlsx'))
         pass
 
     def get_unique_fund_codes(self):
