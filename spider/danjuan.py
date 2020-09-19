@@ -70,8 +70,8 @@ class danjuan(absspider):
         trade_detail_url = u'https://danjuanapp.com/djapi/order/p/plan/{0}'
         # trade_list 唯一 id 集合
         order_id_list = self.df_trade_list.order_id.tolist()
-        tasks = [grequests.get(u'https://danjuanapp.com/djapi/order/p/plan/{0}'.format(x), headers=self.headers) for x in order_id_list]
-        response_list = grequests.map(tasks)
+        tasks = [grequests.get(u'https://danjuanapp.com/djapi/order/p/plan/{0}'.format(x), headers=self.headers, callback=self.grequests_get_callback) for x in order_id_list]
+        response_list = grequests.map(tasks, size=3, exception_handler=self.grequests_exception_handler)
         # 汇总所有的成交记录
 
         # 组合交易
@@ -188,7 +188,7 @@ class danjuan(absspider):
         if len(df_money_temp) > 0:
             df_money_temp['id'] = df_money_temp.reset_index().index + 1
             df_money_temp['date'] = df_money_temp['ts'].apply(lambda x: str(x)[0:10])
-            df_money_temp['time'] = '15:00:00'
+            df_money_temp['time'] = '14:59:00'
             df_money_temp['code'] = df_money_temp['target_fd_code']
             df_money_temp['name'] = df_money_temp['target_fd_name']
             # 目前的基金转换，我只做过南方天天利货币B转指数基金的操作，以后将尽量避免这种繁琐的交易记录
@@ -213,7 +213,7 @@ class danjuan(absspider):
         # print(len(df_plan_exchange_temp))
         df_plan_exchange_temp['id'] = df_plan_exchange_temp.reset_index().index + 1
         df_plan_exchange_temp['date'] = df_plan_exchange_temp['ts'].apply(lambda x: str(x)[0:10])
-        df_plan_exchange_temp['time'] = '15:00:00'
+        df_plan_exchange_temp['time'] = '14:59:00'
         df_plan_exchange_temp['code'] = df_plan_exchange_temp['fd_code']
         df_plan_exchange_temp['name'] = df_plan_exchange_temp['fd_name']
         # 目前的基金转换，我只做过南方天天利货币B转指数基金的操作，以后将尽量避免这种繁琐的交易记录
@@ -249,9 +249,29 @@ class danjuan(absspider):
         df_output = df_output.sort_values(['date', 'code'])
         df_output = df_output.reset_index(drop=True)
         df_output.id = df_output.index + 1
+
+        # 用三级分类表中的名称统一各大基金 APP 中的名称
+        df_output = pd.merge(df_output, self.cm.df_category, left_on='code', right_on='基金代码', how='left')
+        df_output['name'] = df_output['基金名称']
+        df_output = df_output[record_keys()]
         self.df_results = df_output.copy()
         # df_output.to_excel('04_{0}_蛋卷.xlsx'.format(self.user_name), sheet_name=f'{self.user_name}_交易记录')
         pass
+
+    def adjust_dates(self):
+        # 不需要
+        pass
+
+    # grequests
+    def grequests_exception_handler(self, request, exception):
+        print("Request failed: {0}".format(exception))
+
+    def grequests_get_callback(self, request, *args, **kwargs):
+        data_length = len(request.text)
+        if data_length < 20:
+            print('{0} 失败，返回长度小于 20 字符，退出'.format(request.url))
+            exit(1)
+        print(request.url, request, 'data length: ', data_length)
 
     def handle_fund_trades(self, order_ids):
         """
@@ -353,5 +373,7 @@ class danjuan(absspider):
 if __name__ == "__main__":
     dj = danjuan()
     # 设置用户
-    dj.set_user_id('lsy')
+    dj.set_user_id('klq')
+    # dj.set_user_id('lsy')
+    # dj.set_user_id('ksh')
     dj.get()

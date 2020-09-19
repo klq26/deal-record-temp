@@ -16,7 +16,7 @@ if project_folder not in sys.path:
 
 from login.account import account
 from category.categories import categories
-from recordloader import recordloader
+from analysis.recordloader import recordloader
 
 pd.set_option('display.max_columns', 30)
 pd.set_option('display.max_rows', 1100)
@@ -35,7 +35,33 @@ class jqadapter:
         self.unique_fund_codes = self.get_unique_fund_codes()
         pass
     
-    def get_nav_info(self):
+    def get_trade_day_info(self):
+        """
+        获取全部交易日（注意，一年的第一天就能知道今年所有的交易日，所以 2020-01-01 就能拿到 2020 年底的数据）
+        """
+        file_path = path.join(self.folder, u'全部交易日.xlsx')
+        series_all_days = None
+        if os.path.exists(file_path):
+            df = pd.read_excel(file_path, index_col=0)
+            series_all_days = pd.Series(df.day, index=df.index, name='day')
+        else:
+            days = get_all_trade_days()
+            series_all_days = pd.Series([x.strftime('%Y-%m-%d') for x in days], index=pd.to_datetime(days), name='day')
+            series_all_days.to_excel(file_path)
+        # 判断是否跨年，如果跨年，调用 get_all_trade_days 补充新一年的交易日数据
+        # 如果没跨年，那读取缓存即可（每年不到年底时，trade_days 就会给到 12月31日的）
+        year = str(datetime.now().year)
+        try:
+            series_all_days[year]
+        except:
+            # 如果崩溃，说明跨年，应该更新
+            days = get_all_trade_days()
+            series_all_days = pd.Series([x.strftime('%Y-%m-%d') for x in days], index=pd.to_datetime(days), name='day')
+            series_all_days.to_excel(file_path)
+            print('交易日数据已跨年，需要更新')
+        return series_all_days
+
+    def get_nav_info(self, cache = True):
         """
         获取历史上所有基金的交易净值（买入、卖出、分红等）
         TODO 转托管这里好像，不能裸替了事
@@ -55,7 +81,6 @@ class jqadapter:
         df_code_names.drop_duplicates(subset=['code'], inplace=True)
         # 分红表（带缓存）
         df_divid = self.get_divid_info(cache = True)
-
         code_index = 0
         for item in df_code_names.itertuples():
             code = item.code
@@ -76,6 +101,7 @@ class jqadapter:
             end_year = int(end_date[0:4])
             end_month = int(end_date[5:7])
             # 分红确认日
+            # 注：如果这里崩溃，大概率是 df_divid 分红表获取失败导致，目前的修复方法是，分红表获取方法 cache = True
             df_fund_divid = df_divid[(df_divid['基金代码'] == code) & (df_divid['权益登记日'] >= start_date)]
             divid_days = [x[0:10] for x in df_fund_divid['权益登记日'].tolist()]
             df_fund_divid = df_fund_divid.rename(columns={'权益登记日': 'date', '事项名称':'deal_type'})
@@ -198,7 +224,7 @@ class jqadapter:
         df_jq_dividend_split = df_jq_dividend_split.rename(columns=cn_columns)
         origin_columns = df_jq_dividend_split.columns
         df_jq_dividend_split = pd.merge(df_jq_dividend_split, self.cm.df_category, left_on='基金代码', right_on='基金代码', how='left')
-        df_jq_dividend_split['name'] = name
+        df_jq_dividend_split['name'] = df_jq_dividend_split['基金名称']
         df_jq_dividend_split = df_jq_dividend_split[origin_columns]
         df_jq_dividend_split = df_jq_dividend_split.rename(columns={'name': '基金名称'})
         df_jq_dividend_split.to_excel(path.join(self.folder, '分红拆分记录.xlsx'))
@@ -222,5 +248,6 @@ class jqadapter:
 
 if __name__ == "__main__":
     jq = jqadapter()
-    # jq.get_divid_info()
-    jq.get_nav_info()
+    # jq.get_trade_day_info()
+    # jq.get_divid_info(cache = False)
+    jq.get_nav_info(cache = False)

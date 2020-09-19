@@ -5,7 +5,7 @@
         "time": "14:59:00",
         "code": "501018",
         "name": "南方原油A",
-        "deal_type": "卖出",
+        "deal_type": "托管转出",
         "nav_unit": 0.7162,
         "nav_acc": 0.7162,
         "volume": 8925.00,
@@ -13,10 +13,7 @@
         "fee": 0,
         "occur_money": 0,
         "account": "康力泉_天天",
-        "category1": "商品",
-        "category2": "商品",
-        "category3": "原油",
-        "categoryId": 613,
+        "unique_id":"天天_1",
         "note": "https://query.1234567.com.cn/Query/Detail?id=340c5c12b6734d8180fcbe9ecdb3e13d&businType=26&traceNo="
     }
 ]

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import os
+import sys
 import json
 import time, datetime
 from datetime import datetime
@@ -14,15 +15,18 @@ import numpy as np
 
 from absspider import absspider
 from record import record_keys
+from analysis.jqadapter import jqadapter
+from category.fundinfo import fundinfo
 
 # 每次抓包需要修改
-qtk_klq = u'ae63042e58754dbeb099eaf072b9000a'
-qtk_lsy = u'cd8936a1c7e742be87d9eeaa6075ad3a'
+qtk_klq = u'19ab8bd2a2aa4c0b9a47689a2ed01335'
+qtk_lsy = u'19a18149c0844ea98e8505e3c2c3ccc3'
 
 class tiantian(absspider):
 
     def __init__(self, uname=None):
         self.app_name = '天天'
+        self.date_type = '确认日' # 日期需要整体提前一个交易日
         self.headers = {}
         self.name_mapping = {'klq': '康力泉', 'lsy': '李淑云'}
         self.set_user_id(uname)
@@ -64,14 +68,6 @@ class tiantian(absspider):
             self.qkt = qtk_lsy
         self.input_file_name = '{0}_addition.json'.format(self.user_name)
 
-    # def grequests_logging(self, req, *args, **kwargs):
-    #     print('正在请求：{0}'.format(req.url))
-    #     pass
-
-    # def grequests_error_handler(self, req, exception):
-    #     print("{0} 请求出错: {1}".format(req.url, exception))
-    #     pass
-
     def get_trade_list(self):
         # 不需要
         pass
@@ -106,8 +102,8 @@ class tiantian(absspider):
             url2 = url_trade.format(self.server_domain, self.qkt, date_dict['year'], date_dict['month'])
             url3 = url_divid.format(self.server_domain, self.qkt, date_dict['year'], date_dict['month'])
             urls = [url1, url2, url3]
-            tasks = [grequests.get(x, headers = self.headers) for x in urls]
-            resp_list = grequests.map(tasks)
+            tasks = [grequests.get(x, headers = self.headers, callback=self.grequests_get_callback) for x in urls]
+            resp_list = grequests.map(tasks, size=1, exception_handler=self.grequests_exception_handler)
             for resp in resp_list:
                 if u'billhold' in resp.request.url:
                     data_list = json.loads(resp.text.replace(');','').replace('callback(',''))['result']['datas']
@@ -198,6 +194,7 @@ class tiantian(absspider):
         # 补充三级分类
         self.df_divid = pd.merge(self.df_divid, self.cm.df_category, left_on='code', right_on='基金代码', how='left')
         self.df_divid = self.df_divid.rename(columns={'一级分类': 'category1', '二级分类': 'category2', '三级分类': 'category3', '分类ID': 'category_id'})
+        self.df_divid['name'] = self.df_divid['基金名称']
         self.df_divid = self.df_divid[record_keys()]
 
         # 成交记录
@@ -231,19 +228,70 @@ class tiantian(absspider):
         # 补充三级分类
         df = pd.merge(df, self.cm.df_category, left_on='code', right_on='基金代码', how='left')
         df = df.rename(columns={'一级分类': 'category1', '二级分类': 'category2', '三级分类': 'category3', '分类ID': 'category_id'})
+        df['name'] = df['基金名称']
         df = df[record_keys()]
         # print(df.businType.unique())
         # df[df.businType == '卖基金回活期宝']
+        all = [df, self.df_divid]
+        # 自补部分
+        if len(df_addtion_record) > 0:
+            df_addtion_record = pd.merge(df_addtion_record, self.cm.df_category, left_on='code', right_on='基金代码', how='left')
+            df_addtion_record = df_addtion_record.rename(columns={'一级分类': 'category1', '二级分类': 'category2', '三级分类': 'category3', '分类ID': 'category_id'})
+            df_addtion_record['name'] = df_addtion_record['基金名称']
+            df_addtion_record = df_addtion_record[record_keys()]
+            all.append(df_addtion_record)
         # 合并
-        df_results = pd.concat([df, self.df_divid], ignore_index=True)
+        df_results = pd.concat(all, ignore_index=True)
         df_results = df_results.sort_values(['date','code','category_id', 'code'])
         df_results = df_results.reset_index(drop=True)
         df_results['id'] = df_results.index + 1
         self.df_results = df_results.copy()
         pass
 
+    def adjust_dates(self):
+        """
+        对账单中的日期都是确认日，净值日期应该整体前移一天
+        """
+        # 交易日集合
+        jq = jqadapter()
+        series_all_days = jq.get_trade_day_info()
+        # 买入确认日信息（指数型 T+1，QDII T+2）
+        fi = fundinfo()
+        df_operate_info = fi.get_fund_operate_info()
+        df_record = self.df_results.copy()
+        # debug
+        df_record = pd.read_excel('1.xlsx', index_col=0, dtype={'code':str})
+        confirm_dates = df_record.date.tolist()
+        target_codes = df_record.code.tolist()
+        deal_types = df_record.deal_type.tolist()
+        apply_dates = []
+        for i, x in enumerate(confirm_dates):
+            code = target_codes[i]
+            day_to_confirm = int(df_operate_info[df_operate_info['基金代码'] == code].买入确认日.values[0])
+            # print(code, x, deal_types[i], day_to_confirm, series_all_days[series_all_days < x][-day_to_confirm])
+            apply_dates.append(series_all_days[series_all_days < x][-day_to_confirm])
+        df_record['date'] = apply_dates
+        df_record['code'] = df_record['code'].apply(lambda x: str(x).zfill(6))
+        self.df_results = df_record.copy()
+        # debug
+        df_record.to_excel('2.xlsx')
+        pass
+
+    # grequests
+    def grequests_exception_handler(self, request, exception):
+        print("Request failed: {0}".format(exception))
+
+    def grequests_get_callback(self, request, *args, **kwargs):
+        data_length = len(request.text)
+        if data_length < 20:
+            print('{0} 失败，返回长度小于 20 字符，退出'.format(request.url))
+            exit(1)
+        print(request.url, request, 'data length: ', data_length)
+
 if __name__ == "__main__":
     tt = tiantian()
     # 设置用户
-    tt.set_user_id('klq')
-    tt.get()
+    # tt.set_user_id('klq')
+    # tt.set_user_id('lsy')
+    # tt.get()
+    tt.adjust_dates()

@@ -74,6 +74,10 @@ class huatai(absspider):
             money = round(np.abs(x['nav_unit'] * x['volume']), 2)
             return money
 
+    def adjust_dates(self):
+        # 不需要
+        pass
+
     ##################
     # 转换函数
     ##################

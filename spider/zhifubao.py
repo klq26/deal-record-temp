@@ -23,6 +23,10 @@ class zhifubao(absspider):
         # 不需要
         return None
 
+    def adjust_dates(self):
+        # 不需要
+        pass
+
     def get_records(self):
         with open(self.input_file, 'r', encoding='utf-8') as f:
             df = pd.DataFrame([(pd.Series(x)) for x in json.loads(f.read())])

@@ -13,10 +13,6 @@
         "fee": 385.37,
         "occur_money": 80285.01,
         "account": "康世海_且慢_稳稳的幸福",
-        "category1": "债券",
-        "category2": "国内债券",
-        "category3": "可转债",
-        "category_id": 512,
         "unique_id":"且慢_1",
         "note": "我要稳稳的幸福_赎回_orderid=2020010201369690"
     },
@@ -34,10 +30,6 @@
         "fee": 0.0,
         "occur_money": 80285.01,
         "account": "康世海_且慢_稳稳的幸福",
-        "category1": "混合型",
-        "category2": "股债混合",
-        "category3": "偏债",
-        "category_id": 411,
         "unique_id":"且慢_2",
         "note": "我要稳稳的幸福_申购_orderid=自补充"
     },
@@ -55,10 +47,6 @@
         "fee": 30.56,
         "occur_money": 15279.37,
         "account": "康世海_且慢_稳稳的幸福",
-        "category1": "债券",
-        "category2": "国内债券",
-        "category3": "可转债",
-        "category_id": 512,
         "unique_id":"且慢_3",
         "note": "我要稳稳的幸福_赎回_orderid=2020010201369694"
     },
@@ -76,10 +64,6 @@
         "fee": 0.0,
         "occur_money": 15279.37,
         "account": "康世海_且慢_稳稳的幸福",
-        "category1": "债券",
-        "category2": "国内债券",
-        "category3": "可转债",
-        "category_id": 512,
         "unique_id":"且慢_4",
         "note": "我要稳稳的幸福_申购_orderid=自补充"
     },
@@ -97,10 +81,6 @@
         "fee": 0.0,
         "occur_money": 0.0,
         "account": "康世海_且慢_稳稳的幸福",
-        "category1": "债券",
-        "category2": "国内债券",
-        "category3": "可转债",
-        "category_id": 512,
         "unique_id":"且慢_5",
         "note": "我要稳稳的幸福_自补分红"
     },
@@ -118,10 +98,6 @@
         "fee": 0.0,
         "occur_money": 0.0,
         "account": "康世海_且慢_稳稳的幸福",
-        "category1": "债券",
-        "category2": "国内债券",
-        "category3": "可转债",
-        "category_id": 512,
         "unique_id":"且慢_6",
         "note": "我要稳稳的幸福_自补分红"
     },
@@ -139,10 +115,6 @@
         "fee": 0.0,
         "occur_money": 0.0,
         "account": "康世海_且慢_稳稳的幸福",
-        "category1": "混合型",
-        "category2": "股债混合",
-        "category3": "偏债",
-        "category_id": 411,
         "unique_id":"且慢_7",
         "note": "我要稳稳的幸福_自补分红"
     },
@@ -160,10 +132,6 @@
         "fee": 0.0,
         "occur_money": 0.0,
         "account": "康世海_且慢_稳稳的幸福",
-        "category1": "债券",
-        "category2": "国内债券",
-        "category3": "可转债",
-        "category_id": 512,
         "unique_id":"且慢_8",
         "note": "我要稳稳的幸福_自补分红"
     },
@@ -181,10 +149,6 @@
         "fee": 0.0,
         "occur_money": 0.0,
         "account": "康世海_且慢_稳稳的幸福",
-        "category1": "混合型",
-        "category2": "股债混合",
-        "category3": "偏债",
-        "category_id": 411,
         "unique_id":"且慢_9",
         "note": "我要稳稳的幸福_自补分红"
     }

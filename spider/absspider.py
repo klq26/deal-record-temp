@@ -30,6 +30,8 @@ class absspider(ABC):
     app_name = '未设置'
     # 用户名
     user_name = '康力泉'
+    # 日期类型（天天基金是确认日，且慢是申请日（但是要判断时间，如15:01:00 要错后一天），蛋卷基金是正确的申请日）
+    date_type = ''
     # 当前文件夹
     folder = path.abspath(path.dirname(__file__))
     # 分类信息
@@ -91,6 +93,11 @@ class absspider(ABC):
         print('整理可用交易记录')
         self.get_records()
         if len(self.df_results) > 0:
+            if date_type != '':
+                # 天天 - 提前一天
+                # 且慢 - 看时间，如果大于 15 点，后搓一天
+                # 蛋卷 - 无需处理
+                self.adjust_dates()
             self.save_record_list()
 
     def save_trade_list(self):
@@ -132,5 +139,12 @@ class absspider(ABC):
     def get_records(self):
         """
         Step 3. 获取基金成交记录（每条记录应有唯一 id）
+        """
+        pass
+    
+    @abstractmethod
+    def adjust_dates(self):
+        """
+        *Step 4. 部分场外基金，需要对操作日期进行调整
         """
         pass

@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+import os
 import json
 import time, datetime
 
@@ -11,6 +12,7 @@ import numpy as np
 
 from absspider import absspider
 from record import record_keys
+from analysis.jqadapter import jqadapter
 
 class qieman(absspider):
     
@@ -51,8 +53,8 @@ class qieman(absspider):
     def get_trade_list(self):
         # 获取所有计划的交易列表
         trade_list_url = u'https://qieman.com/pmdj/v2/orders?capitalAccountId={0}&page=0&size=500'
-        tasks = [grequests.get(trade_list_url.format(x['value']), headers=self.headers) for x in self.plan_list]
-        response_list = grequests.map(tasks)
+        tasks = [grequests.get(trade_list_url.format(x['value']), headers=self.headers, callback=self.grequests_get_callback) for x in self.plan_list]
+        response_list = grequests.map(tasks, size=3, exception_handler=self.grequests_exception_handler)
         trade_list = []
         for response in response_list:
             [trade_list.append(x) for x in response.json()['content']]
@@ -71,8 +73,8 @@ class qieman(absspider):
     def get_raw_record_list(self):
         # 获取原始交易记录
         trade_detail_url = u'https://qieman.com/pmdj/v2/orders/{0}'
-        tasks = [grequests.get(trade_detail_url.format(x), headers=self.headers) for x in self.df_trade_list.orderId.tolist()]
-        response_list = grequests.map(tasks)
+        tasks = [grequests.get(trade_detail_url.format(x), headers=self.headers, callback=self.grequests_get_callback) for x in self.df_trade_list.orderId.tolist()]
+        response_list = grequests.map(tasks, size=3, exception_handler=self.grequests_exception_handler)
         trade_detail_list = []
         for response in response_list:
             jsonData = response.json()
@@ -118,20 +120,57 @@ class qieman(absspider):
         df['deal_money'] = df.apply(self.deal_money_calc, axis=1)
         df['occur_money'] = df.apply(self.occur_money_calc, axis=1)
         df['account'] = '{0}_且慢'.format(self.user_name)
-        # 补充一二三级分类
-        df = pd.merge(df, self.cm.df_category, left_on='code', right_on='基金代码', how='left')
-        df = df.rename(columns={'一级分类': 'category1', '二级分类': 'category2', '三级分类': 'category3', '分类ID': 'category_id'})
-        df['unique_id'] = df['orderId']
-        df['note'] = df['planName'] + '_' + df['uiOrderCodeName'] + '_orderid=' + df['orderId']
         # 补充额外记录
         if len(df_addtion_record) > 0:
             df = pd.concat([df, df_addtion_record], sort=False)
+        # 补充一二三级分类
+        df = pd.merge(df, self.cm.df_category, left_on='code', right_on='基金代码', how='left')
+        df = df.rename(columns={'一级分类': 'category1', '二级分类': 'category2', '三级分类': 'category3', '分类ID': 'category_id'})
+        df['unique_id'] = df.apply(self.unique_id_calc, axis=1)
+        # 用三级分类表中的名称统一各大基金 APP 中的名称
+        df['name'] = df['基金名称']
+        df['note'] = df.apply(self.note_calc, axis=1)
         df = df.sort_values(['date','time'])
         df = df.reset_index()
-        df['id'] = df.index + 1
+        df['id'] = df.index + 1       
         df = df[record_keys()]
         self.df_results = df.copy()
         pass
+
+    def adjust_dates(self):
+        """
+        对账单中的日期是真实申请的时间，如果时间晚于 15:00:00，净值日期应该后搓一天
+        """
+        jq = jqadapter()
+        series_all_days = jq.get_trade_day_info()
+        df_record = self.df_results.copy()
+        adjust_dates = []
+        adjust_times = []
+        for x in df_record.itertuples():
+            hour = int(x.time[0:2])
+            if hour >= 15:
+                next_trade_day = series_all_days[series_all_days > x.date][0]
+                adjust_dates.append(next_trade_day)
+                adjust_times.append('14:59:00')
+            else:
+                adjust_dates.append(x.date)
+                adjust_times.append(x.time)
+        df_record['date'] = adjust_dates
+        df_record['time'] = adjust_times
+        df_record['code'] = df_record['code'].apply(lambda x: str(x).zfill(6))
+        self.df_results = df_record.copy()
+        pass
+
+    # grequests
+    def grequests_exception_handler(self, request, exception):
+        print("Request failed: {0}".format(exception))
+
+    def grequests_get_callback(self, request, *args, **kwargs):
+        data_length = len(request.text)
+        if data_length < 20:
+            print('{0} 失败，返回长度小于 20 字符，退出'.format(request.url))
+            exit(1)
+        print(request.url, request, 'data length: ', data_length)
 
     def deal_type_calc(self, val):
         x = val['uiOrderCodeName']
@@ -168,8 +207,21 @@ class qieman(absspider):
             occur_money = money
         return occur_money
 
+    def unique_id_calc(self, x):
+        if pd.isna(x['orderId']):
+            return x['unique_id']
+        else:
+            return x['orderId']
+
+    def note_calc(self, x):
+        if pd.isna(x['orderId']):
+            return x['note']
+        else:
+            return x['planName'] + '_' + x['uiOrderCodeName'] + '_orderid=' + x['orderId']
+
 if __name__ == "__main__":
     qm = qieman()
     # 设置用户
     qm.set_user_id('klq')
+    # qm.set_user_id('ksh')
     qm.get()

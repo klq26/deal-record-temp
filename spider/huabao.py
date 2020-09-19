@@ -57,6 +57,10 @@ class huabao(absspider):
         df = df[record_keys()]
         self.df_results = df.copy()
 
+    def adjust_dates(self):
+        # 不需要
+        pass
+
     ##################
     # 转换函数
     ##################
