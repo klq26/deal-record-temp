@@ -246,8 +246,41 @@ class jqadapter:
         fund_codes = series.unique()
         return fund_codes
 
+    def get_fund_operate_type(self):
+        """
+        获取基金的交易方式（开放式、LOF、ETF、QDII 等。FOF 是持有基金的基金，感觉用处不大，应该不会买）
+        """
+        # 1. 获取支持查询的基金代码表
+        df = self.cm.df_category
+        df_sub = df[~(df['市场'] == '不适用')]
+        df_sub = df[~(df['三级分类'] == '股票')]
+        code_list = df_sub.基金代码.unique().tolist()
+        # 2. 查询
+        df_jq = finance.run_query(
+            query(
+                finance.FUND_MAIN_INFO
+            ).filter(
+                finance.FUND_MAIN_INFO.main_code.in_(code_list)
+            )
+        )
+        # 3. 合并且调整格式
+        df_results = pd.merge(df, df_jq, left_on='基金代码', right_on='main_code', how='left')
+        cols = df.columns.tolist()
+        cols.append('operate_mode')
+        df_results = df_results[cols]
+        df_results.rename(columns={'operate_mode':'基金类型'}, inplace=True)
+        df_results.fillna(value={'基金类型':'不适用'}, inplace=True)
+        df_results.replace({'开放式基金':'场外'}, inplace=True)
+        df_results = df_results[['基金名称', '基金简称', '基金代码', '基金类型', '市场', '一级分类', '二级分类', '三级分类', '分类ID']]
+        self.cm.df_category = df_results.copy()
+        # 4. 保存
+        self.cm.save_category_file()
+
+        return df_results
+
 if __name__ == "__main__":
     jq = jqadapter()
     # jq.get_trade_day_info()
     # jq.get_divid_info(cache = False)
-    jq.get_nav_info(cache = False)
+    # jq.get_nav_info(cache = False)
+    jq.get_fund_operate_type()

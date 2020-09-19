@@ -19,6 +19,14 @@ class categories:
         self.df_category3_ext = self.refresh_category3_extension_file()
         pass
 
+    def save_category_file(self):
+        """
+        把内存中修改过的文件，存入磁盘
+        """
+        self.xlsx_path = os.path.join(self.folder, u'资产配置分类表.xlsx')
+        self.df_category.to_excel(self.xlsx_path, sheet_name='资产分类')
+        pass
+
     def refresh_category_file(self):
         """
         加载三级分类表
