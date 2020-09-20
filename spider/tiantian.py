@@ -19,8 +19,8 @@ from analysis.jqadapter import jqadapter
 from category.fundinfo import fundinfo
 
 # 每次抓包需要修改
-qtk_klq = u'19ab8bd2a2aa4c0b9a47689a2ed01335'
-qtk_lsy = u'19a18149c0844ea98e8505e3c2c3ccc3'
+qtk_klq = u'4a880ad663fc401aa625553727ccd5c5'
+qtk_lsy = u'881e21589fe94a00bfc4ef8c192509cf'
 
 class tiantian(absspider):
 
@@ -71,7 +71,6 @@ class tiantian(absspider):
     def get_trade_list(self):
         # 不需要
         pass
-    
     def get_raw_record_list(self):
         # qkt 参数不可或缺，抓 cookie 的时候搜索 bi.aspx
         # 持仓
@@ -260,7 +259,7 @@ class tiantian(absspider):
         df_operate_info = fi.get_fund_operate_info()
         df_record = self.df_results.copy()
         # debug
-        df_record = pd.read_excel('1.xlsx', index_col=0, dtype={'code':str})
+        # df_record = pd.read_excel('1.xlsx', index_col=0, dtype={'code':str})
         confirm_dates = df_record.date.tolist()
         target_codes = df_record.code.tolist()
         deal_types = df_record.deal_type.tolist()
@@ -274,7 +273,7 @@ class tiantian(absspider):
         df_record['code'] = df_record['code'].apply(lambda x: str(x).zfill(6))
         self.df_results = df_record.copy()
         # debug
-        df_record.to_excel('2.xlsx')
+        # df_record.to_excel('2.xlsx')
         pass
 
     # grequests
@@ -291,7 +290,7 @@ class tiantian(absspider):
 if __name__ == "__main__":
     tt = tiantian()
     # 设置用户
-    # tt.set_user_id('klq')
-    # tt.set_user_id('lsy')
-    # tt.get()
-    tt.adjust_dates()
+    tt.set_user_id('klq')
+    tt.set_user_id('lsy')
+    tt.get()
+    # tt.adjust_dates()

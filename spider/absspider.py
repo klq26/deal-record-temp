@@ -93,7 +93,7 @@ class absspider(ABC):
         print('整理可用交易记录')
         self.get_records()
         if len(self.df_results) > 0:
-            if date_type != '':
+            if self.date_type != '':
                 # 天天 - 提前一天
                 # 且慢 - 看时间，如果大于 15 点，后搓一天
                 # 蛋卷 - 无需处理

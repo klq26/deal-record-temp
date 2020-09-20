@@ -73,6 +73,13 @@ class jqadapter:
         # 3. 创建月末标记列，用于将来做月底净值统计之用。
 
         df_results = None
+        file_path = path.join(self.folder, '基金净值数据.xlsx')
+        if cache and os.path.exists(file_path):
+            dtypes = {
+                'code': str
+            }
+            df = pd.read_excel(file_path, dtype = dtypes, index_col=0)
+            return df
         # 所有成交记录（买卖、分红、转托管）
         df = self.rc_loader.get_all_users_combine_records()
         # 无法统计股票
@@ -171,7 +178,7 @@ class jqadapter:
         df_results.reset_index(drop=True, inplace=True)
         # 最后多了一些没有净值和 deal_type 的数据，暂时不知道为啥
         df_results.dropna(subset=['nav_unit', 'nav_acc'], inplace=True)
-        df_results.to_excel(path.join(self.folder, '基金净值数据.xlsx'))
+        df_results.to_excel(file_path)
         pass
 
     def get_divid_info(self, cache = True):
@@ -278,9 +285,78 @@ class jqadapter:
 
         return df_results
 
+    def update_nav_of_all_records(self):
+        """
+        1. 更新所有需要调整的 APP 的净值和日期数据（天天、且慢、蛋卷，其他不用）
+        2. 更新整体表
+        """
+        file_paths = []
+        output_path = path.join(project_folder, 'output')
+        for root, dirs, files in os.walk(output_path):
+            for f in files:
+                # 最终结果产出文件（忽略中间过程文件）
+                if f.startswith(u'03'):
+                    should_select = False
+                    for app in ['天天', '且慢', '蛋卷']:
+                        should_select = should_select or app in f
+                    if should_select:
+                        file_paths.append(path.join(root, f))
+        # 聚宽净值
+        df_nav = self.get_nav_info(cache = True)
+        df_nav.date = df_nav.date.astype(np.datetime64)
+        # 内部函数
+        def calc_date(x):
+            op = x['deal_type']
+            if op == '分红':
+                # 日期游标（除权日，可能在给定日期前后的一个范围内）
+                # 非货币基金的分红，通常稍有一个月触发 2 次及以上的
+                date_cursor = x['date']
+                # 上边界，15 天以前
+                before = pd.DatetimeIndex(end=date_cursor, freq='D', periods=15)[0]
+                # 下边界 15 天以后
+                after = pd.DatetimeIndex(start=date_cursor, freq='D', periods=15)[-1]
+                
+                df_temp = df_nav[(df_nav['code'] == x['code']) & (df_nav['date'] >= before) & (df_nav['date'] <= after) & (df_nav['deal_type'] == '分红')]
+                # print(date_cursor, before, after, df_temp)
+                if len(df_temp) > 0:
+                    return str(df_temp.date.values[0])[0:10]
+                else:
+                    return '无法补充'
+                pass
+            else:
+                return x['date']
+            pass
+
+        def calc_nav_unit(x):
+            df_temp = df_nav[(df_nav['code'] == x['code']) & (df_nav['date'] == x['date'])]
+            # print(df_temp)
+            if len(df_temp) > 0:
+                return df_temp.nav_unit.values[0]
+            else:
+                # return '无法补充'
+                return x['nav_unit']
+
+        def calc_nav_acc(x):
+            df_temp = df_nav[(df_nav['code'] == x['code']) & (df_nav['date'] == x['date'])]
+            # print(df_temp)
+            if len(df_temp) > 0:
+                return df_temp.nav_acc.values[0]
+            else:
+                # return '无法补充'
+                return x['nav_acc']
+        # 需要调整的文件
+        for i, file_path in enumerate(file_paths):
+            print('处理：{0} ...'.format(file_path))
+            df_r = pd.read_excel(file_path, index_col=0, dtype={'code':str})
+            df_r['date'] = df_r.apply(calc_date, axis=1)
+            df_r['nav_unit'] = df_r.apply(calc_nav_unit, axis=1)
+            df_r['nav_acc'] = df_r.apply(calc_nav_acc, axis=1)
+            df_r.to_excel('{0}'.format(file_path.split(path.sep)[-1]))
+
 if __name__ == "__main__":
     jq = jqadapter()
     # jq.get_trade_day_info()
     # jq.get_divid_info(cache = False)
     # jq.get_nav_info(cache = False)
-    jq.get_fund_operate_type()
+    # jq.get_fund_operate_type()
+    jq.update_nav_of_all_records()
