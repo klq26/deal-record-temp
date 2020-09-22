@@ -35,7 +35,7 @@ class xlsxfmt:
                     xlsx_files.append(xlsx_path)
         # 逐一格式化
         for i, xlsx_file in enumerate(xlsx_files):
-            print(f' [{i + 1} / {len(xlsx_files)} ] 格式化 {xlsx_file}')
+            print(f' [ {i + 1} / {len(xlsx_files)} ] 格式化 {xlsx_file}')
             self.format_xlsx_file(xlsx_file)
         pass
     

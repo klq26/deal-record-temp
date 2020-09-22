@@ -176,7 +176,7 @@ class qieman(absspider):
         x = val['uiOrderCodeName']
         if u'赎回' in x:
             return '卖出'
-        elif u'购买' in x:
+        elif u'购买' in x or u'申购' in x:
             return '买入'
         elif u'转托管' in x:
             return '卖出'

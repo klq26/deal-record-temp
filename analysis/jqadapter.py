@@ -18,8 +18,8 @@ from login.account import account
 from category.categories import categories
 from analysis.recordloader import recordloader
 
-pd.set_option('display.max_columns', 30)
-pd.set_option('display.max_rows', 1100)
+pd.set_option('display.max_columns', None)
+pd.set_option('display.max_rows', None)
 
 class jqadapter:
 
@@ -85,6 +85,7 @@ class jqadapter:
         # 无法统计股票
         df = df[~(df['category3'] == '股票')]
         df_code_names = df[['code', 'name']]
+        # df_code_names = df_code_names[df_code_names['code'] == '502010']
         df_code_names.drop_duplicates(subset=['code'], inplace=True)
         # 分红表（带缓存）
         df_divid = self.get_divid_info(cache = True)
@@ -96,7 +97,7 @@ class jqadapter:
             df_fund_trade = df[(df.code == code) & ~(df.deal_type == '分红') & ~(df.deal_type == '托管转出') & ~(df.deal_type == '托管转入')]
             df_fund_trade = df_fund_trade[['date', 'deal_type']]
             # 去掉重复交易日期
-            df_fund_trade = df_fund_trade.drop_duplicates()
+            df_fund_trade = df_fund_trade.drop_duplicates(subset=['date'])
             fund_trade_days = df_fund_trade.date.unique().tolist()
             # 开始日期
             start_date = fund_trade_days[0]
@@ -177,7 +178,15 @@ class jqadapter:
         df_results.sort_values(['code','date'], inplace=True)
         df_results.reset_index(drop=True, inplace=True)
         # 最后多了一些没有净值和 deal_type 的数据，暂时不知道为啥
-        df_results.dropna(subset=['nav_unit', 'nav_acc'], inplace=True)
+        df_results.dropna(subset=['nav_unit'], inplace=True)
+        # 内部函数，502010 证券公司，这样的数据，库里没有累计净值
+        def _fill_acc(x):
+            if pd.isna(x.nav_acc):
+                return x.nav_unit
+            else:
+                return x.nav_acc
+            pass
+        df_results['nav_acc'] = df_results.apply(_fill_acc, axis=1)
         df_results.to_excel(file_path)
         pass
 
@@ -188,8 +197,10 @@ class jqadapter:
         divid_file_path = path.join(self.folder, '分红拆分记录.xlsx')
         if cache and os.path.exists(divid_file_path):
             dtypes = {
+                '公布日期': str,
                 '基金代码': str,
-                '权益登记日': str
+                '权益登记日': str,
+                '除息日': str
             }
             df = pd.read_excel(divid_file_path, dtype = dtypes, index_col=0)
             return df
@@ -234,8 +245,23 @@ class jqadapter:
         df_jq_dividend_split['name'] = df_jq_dividend_split['基金名称']
         df_jq_dividend_split = df_jq_dividend_split[origin_columns]
         df_jq_dividend_split = df_jq_dividend_split.rename(columns={'name': '基金名称'})
+        # 注：聚宽数据库不全，例如 2020年9月22日 时，502010 在 2020年7月7日的拆分信息就没有在库中，只能自补
+        # 但是，重复信息也不影响使用
+        addition_divid_file_path = path.join(self.folder, '自补分红拆分记录.xlsx')
+        if os.path.exists(addition_divid_file_path):
+            dtypes = {
+                '公布日期': str,
+                '基金代码': str,
+                '权益登记日': str,
+                '除息日': str
+            }
+            df_addition_dividend = pd.read_excel(addition_divid_file_path, dtype = dtypes, index_col=0)
+            df_jq_dividend_split = df_jq_dividend_split.append(df_addition_dividend, ignore_index=True)
+            df_jq_dividend_split.sort_values(['基金代码','公布日期'], inplace=True)
         df_jq_dividend_split.to_excel(path.join(self.folder, '分红拆分记录.xlsx'))
-        pass
+        
+
+        return df_jq_dividend_split
 
     def get_unique_fund_codes(self):
         """
@@ -345,13 +371,13 @@ class jqadapter:
                 # return '无法补充'
                 return x['nav_acc']
         # 需要调整的文件
-        for i, file_path in enumerate(file_paths):
+        for file_path in file_paths:
             print('处理：{0} ...'.format(file_path))
             df_r = pd.read_excel(file_path, index_col=0, dtype={'code':str})
             df_r['date'] = df_r.apply(calc_date, axis=1)
             df_r['nav_unit'] = df_r.apply(calc_nav_unit, axis=1)
             df_r['nav_acc'] = df_r.apply(calc_nav_acc, axis=1)
-            df_r.to_excel('{0}'.format(file_path.split(path.sep)[-1]))
+            df_r.to_excel(file_path)
 
 if __name__ == "__main__":
     jq = jqadapter()

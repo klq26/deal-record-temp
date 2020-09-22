@@ -119,6 +119,7 @@ class recordloader:
         df = df.reset_index(drop=True)
         # 家庭整体交易记录
         df.id = df.index + 1
+        df.to_excel(path.join(project_folder, 'output', '全部记录.xlsx'))
         return df
 
 if __name__ == "__main__":
@@ -127,3 +128,4 @@ if __name__ == "__main__":
     r.get_records()
     r.set_user_id('parents')
     r.get_records()
+    r.get_all_users_combine_records()
